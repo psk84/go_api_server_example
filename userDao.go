@@ -27,10 +27,10 @@ func insertUser(name string, pwd string) bool {
 	session.SetMode(mgo.Monotonic, true)
 
 	// Drop Database
-	err = session.DB("test").DropDatabase()
-	if err != nil {
-		panic(err)
-	}
+	// err = session.DB("test").DropDatabase()
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	c := session.DB("test").C("user")
 	// Index
@@ -80,7 +80,7 @@ func selectUser(name string, pwd string) *User {
 
 	// Query
 	var result User
-	err = c.Find(bson.M{"userId": name}).One(&result)
+	err = c.Find(bson.M{"userId": name, "pwd": pwd}).One(&result)
 
 	if err != nil {
 		return nil
@@ -89,3 +89,29 @@ func selectUser(name string, pwd string) *User {
 
 	return &result
 }
+
+// func findUserPassword(name string) *User {
+// 	fmt.Println("Find User Password: ", name)
+// 	session, err := mgo.Dial("localhost")
+
+// 	if err != nil {
+// 		panic(err)
+// 		fmt.Println("error : ", err)
+// 	}
+// 	defer session.Close()
+
+// 	session.SetMode(mgo.Monotonic, true)
+
+// 	c := session.DB("test").C("user")
+
+// 	// Query
+// 	var result User
+// 	err = c.Find(bson.M{"userId": name}).One(&result)
+
+// 	if err != nil {
+// 		return nil
+// 	}
+// 	fmt.Println("Results All: ", result)
+
+// 	return &result
+// }

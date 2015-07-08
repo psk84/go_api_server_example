@@ -1,78 +1,91 @@
 package main
 
 import (
-	"database/sql"
-	_ "github.com/go-sql-driver/mysql"
-	"log"
+	"fmt"
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 )
 
-func insertUser(name string, pwd string) (int, bool) {
-	log.Println("Open Mysql Connection")
-	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:3306)/sample?charset=utf8")
-	if err != nil {
-		log.Fatal("Fail to connect : ", err)
-		return 0, false
-	}
-
-	defer db.Close()
-
-	log.Println("prepare statment")
-	stmt, err := db.Prepare("INSERT INTO user(name, pwd) VALUES( ?, ? )")
-
-	if err != nil {
-		log.Fatal("prepare statment error : ", err)
-		return 0, false
-	}
-	defer stmt.Close()
-
-	log.Println("excute statment")
-	res, err := stmt.Exec(name, pwd)
-	if err != nil {
-		log.Fatal(err)
-		return 0, false
-	}
-
-	lastId, err := res.LastInsertId()
-	if err != nil {
-		log.Fatal(err)
-		return 0, false
-	}
-
-	return int(lastId), true
+type User struct {
+	Id     bson.ObjectId `bson:"_id,omitempty"`
+	UserId string        `bson:"userId"`
+	Pwd    string        `bson:"pwd"`
 }
 
-func selectUser(name string, pwd string) bool {
-	log.Println("Open Mysql Connection")
-	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:3306)/sample?charset=utf8")
-	if err != nil {
-		log.Fatal("Fail to connect : ", err)
-		return false
-	}
+func insertUser(name string, pwd string) bool {
+	fmt.Println("Insert User : ", name)
+	var result bool = false
 
-	defer db.Close()
-
-	log.Println("prepare statment")
-	stmtOut, err := db.Prepare("SELECT * FROM user WHERE name = ? and pwd =? ")
-	if err != nil {
-		panic(err.Error()) // proper error handling instead of panic in your app
-		return false
-	}
-	defer stmtOut.Close()
-
-	user := &User{}
-
-	err = stmtOut.QueryRow(name, pwd).Scan(&user)
+	session, err := mgo.Dial("localhost")
 
 	if err != nil {
-		panic(err.Error()) // proper error handling instead of panic in your app
-		return false
+		panic(err)
+		fmt.Println("error : ", err)
+	}
+	defer session.Close()
+
+	session.SetMode(mgo.Monotonic, true)
+
+	// Drop Database
+	err = session.DB("test").DropDatabase()
+	if err != nil {
+		panic(err)
 	}
 
-	log.Println("%s, %s", user.name, user.pwd)
+	c := session.DB("test").C("user")
+	// Index
+	index := mgo.Index{
+		Key:        []string{"userId", "pwd"},
+		Unique:     true,
+		DropDups:   true,
+		Background: true,
+		Sparse:     true,
+	}
 
-	if user.name != "" && user.pwd != "" {
-		return true
+	err = c.EnsureIndex(index)
+	if err != nil {
+		panic(err)
+	}
+
+	value := &User{Id: bson.NewObjectId(), UserId: name, Pwd: pwd}
+	fmt.Println("value : ", value)
+
+	// Insert Datas
+	err = c.Insert(value)
+
+	if err != nil {
+		result = false
 	} else {
-		return false
+		result = true
 	}
+
+	fmt.Println("Insert result : ", result)
+
+	return result
+}
+
+func selectUser(name string, pwd string) *User {
+	fmt.Println("Select User : ", name)
+	session, err := mgo.Dial("localhost")
+
+	if err != nil {
+		panic(err)
+		fmt.Println("error : ", err)
+	}
+	defer session.Close()
+
+	session.SetMode(mgo.Monotonic, true)
+
+	c := session.DB("test").C("user")
+
+	// Query
+	var result User
+	err = c.Find(bson.M{"userId": name}).One(&result)
+
+	if err != nil {
+		return nil
+	}
+	fmt.Println("Results All: ", result)
+
+	return &result
 }

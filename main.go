@@ -5,6 +5,8 @@ import (
 	"net/http"
 )
 
+type handler func(w http.ResponseWriter, r *http.Request)
+
 func main() {
 
 	// public views
